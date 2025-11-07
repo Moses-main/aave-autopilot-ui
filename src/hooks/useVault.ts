@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { erc20Abi, formatUnits, parseUnits } from 'viem';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { erc20Abi, formatUnits, parseUnits, Address } from 'viem';
 
 // Vault ABI - simplified for our use case
 const vaultABI = [
@@ -57,9 +56,9 @@ type VaultState = {
   isLoading: boolean;
   
   // Transaction hashes
-  approveHash: `0x${string}` | null;
-  depositHash: `0x${string}` | null;
-  withdrawHash: `0x${string}` | null;
+  approveHash?: `0x${string}`;
+  depositHash?: `0x${string}`;
+  withdrawHash?: `0x${string}`;
   
   // Actions
   approve: (amount: string) => Promise<`0x${string}` | undefined>;
@@ -72,7 +71,6 @@ type VaultState = {
 
 export function useVault(): VaultState {
   const { address } = useAccount();
-  const queryClient = useQueryClient();
   const vaultAddress = (import.meta.env.VITE_CONTRACT_ADDRESS || '') as `0x${string}`;
   const usdcAddress = (import.meta.env.VITE_USDC_ADDRESS || '') as `0x${string}`;
   
@@ -148,10 +146,10 @@ export function useVault(): VaultState {
 
     try {
       const hash = await writeContractAsync({
-        address: usdcAddress,
+        address: usdcAddress as Address,
         abi: erc20Abi,
         functionName: 'approve',
-        args: [vaultAddress, amountWei],
+        args: [vaultAddress as Address, amountWei],
       });
 
       setApproveHash(hash);
@@ -178,10 +176,10 @@ export function useVault(): VaultState {
 
     try {
       const hash = await writeContractAsync({
-        address: vaultAddress,
+        address: vaultAddress as Address,
         abi: vaultABI,
         functionName: 'deposit',
-        args: [amountWei, address],
+        args: [amountWei, address as Address],
       });
 
       setDepositHash(hash);
@@ -208,10 +206,10 @@ export function useVault(): VaultState {
 
     try {
       const hash = await writeContractAsync({
-        address: vaultAddress,
+        address: vaultAddress as Address,
         abi: vaultABI,
         functionName: 'withdraw',
-        args: [amountWei, address, address],
+        args: [amountWei, address as Address, address as Address],
       });
 
       setWithdrawHash(hash);

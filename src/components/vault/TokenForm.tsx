@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatUnits, parseUnits } from 'viem';
+import { formatUnits } from 'viem';
 import { Token } from '@/types/aave';
-import { formatNumber, formatUSD } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
 
 interface TokenFormProps {
   token: Token;

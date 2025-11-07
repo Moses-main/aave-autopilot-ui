@@ -1,8 +1,8 @@
 // src/hooks/useAaveV3.ts
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { erc20Abi, formatUnits, parseUnits } from 'viem';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, } from 'react';
+import { erc20Abi, parseUnits, Address } from 'viem';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 // AAVE V3 Pool ABI - simplified for our use case
 const aaveV3PoolABI = [
@@ -46,8 +46,8 @@ type AaveV3State = {
   isLoading: boolean;
   
   // Transaction hashes
-  supplyHash: `0x${string}` | null;
-  withdrawHash: `0x${string}` | null;
+  supplyHash?: `0x${string}`;
+  withdrawHash?: `0x${string}`;
   
   // Actions
   supply: (amount: string) => Promise<`0x${string}` | undefined>;
@@ -127,10 +127,16 @@ export function useAaveV3(): AaveV3State {
 
       // Then supply to AAVE
       const hash = await writeContractAsync({
-        address: poolAddress,
+        address: poolAddress as Address,
         abi: aaveV3PoolABI,
         functionName: 'supply',
-        args: [usdcAddress, amountWei, address, 0, 0], // 0 = no referral
+        args: [
+          usdcAddress as Address, 
+          amountWei, 
+          address as Address,
+          0 as const, // interestRateMode
+          address as Address // onBehalfOf
+        ],
       });
 
       setSupplyHash(hash);
@@ -157,10 +163,14 @@ export function useAaveV3(): AaveV3State {
 
     try {
       const hash = await writeContractAsync({
-        address: poolAddress,
+        address: poolAddress as Address,
         abi: aaveV3PoolABI,
         functionName: 'withdraw',
-        args: [usdcAddress, amountWei, address],
+        args: [
+          usdcAddress as Address, 
+          amountWei, 
+          address as Address
+        ],
       });
 
       setWithdrawHash(hash);
@@ -191,27 +201,25 @@ export function useAaveV3(): AaveV3State {
     },
   });
 
-  return {
+  const state: AaveV3State = {
     // Balances
-    usdcBalance: formatUnits(usdcBalance, 6),
-    aTokenBalance: formatUnits(aTokenBalance, 6),
-    totalSupplied: formatUnits(totalSupplied, 6),
-    healthFactor,
-    
+    usdcBalance: usdcBalance?.toString() || '0',
+    aTokenBalance: aTokenBalance?.toString() || '0',
+    totalSupplied: totalSupplied?.toString() || '0',
+    healthFactor: healthFactor?.toString() || '0',
     // Loading states
     isSupplying,
     isWithdrawing,
     isLoading: isSupplying || isWithdrawing,
-    
     // Transaction hashes
-    supplyHash,
-    withdrawHash,
-    
+    supplyHash: supplyHash || undefined,
+    withdrawHash: withdrawHash || undefined,
     // Actions
     supply,
     withdraw,
-    
     // Errors
     error,
   };
+
+  return state;
 }

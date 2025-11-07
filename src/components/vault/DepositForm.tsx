@@ -18,10 +18,10 @@ export function DepositForm() {
   } = useVault();
 
   const needsApproval = parseFloat(amount) > 0 && 
-    (allowance === 0n || (allowance && parseUnits(amount, 6) > allowance));
+    (BigInt(allowance) === 0n || (allowance && parseUnits(amount, 6) > BigInt(allowance)));
 
   const handleMax = () => {
-    setAmount(usdcBalance);
+    setAmount(usdcBalance.toString());
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
