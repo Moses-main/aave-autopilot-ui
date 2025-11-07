@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { erc20Abi, formatUnits, parseUnits, Address } from 'viem';
+import { useWatchTransactionReceipt } from './useWatchTransactionReceipt';
 
 // Vault ABI - simplified for our use case
 const vaultABI = [
@@ -55,10 +56,10 @@ type VaultState = {
   isWithdrawing: boolean;
   isLoading: boolean;
   
-  // Transaction hashes
-  approveHash?: `0x${string}`;
-  depositHash?: `0x${string}`;
-  withdrawHash?: `0x${string}`;
+  // Transaction hashes (optional)
+  approveHash?: `0x${string}` | null;
+  depositHash?: `0x${string}` | null;
+  withdrawHash?: `0x${string}` | null;
   
   // Actions
   approve: (amount: string) => Promise<`0x${string}` | undefined>;
@@ -223,8 +224,8 @@ export function useVault(): VaultState {
     }
   };
 
-  // Wait for transaction receipts and refetch data
-  useWaitForTransactionReceipt({
+  // Watch for transaction receipts and refetch data
+  useWatchTransactionReceipt({
     hash: approveHash,
     onSuccess: () => {
       refetchAllowance();
@@ -232,7 +233,7 @@ export function useVault(): VaultState {
     },
   });
 
-  useWaitForTransactionReceipt({
+  useWatchTransactionReceipt({
     hash: depositHash,
     onSuccess: () => {
       refetchUsdcBalance();
@@ -241,7 +242,7 @@ export function useVault(): VaultState {
     },
   });
 
-  useWaitForTransactionReceipt({
+  useWatchTransactionReceipt({
     hash: withdrawHash,
     onSuccess: () => {
       refetchUsdcBalance();
@@ -257,22 +258,22 @@ export function useVault(): VaultState {
 
   return {
     // Balances
-    usdcBalance: formatUnits(usdcBalance, 6),
-    vaultBalance: formatUnits(vaultBalance, 6),
-    totalAssets: formatUnits(totalAssets, 6),
-    sharePrice,
-    allowance: formatUnits(allowance, 6),
+    usdcBalance: usdcBalance?.toString() || '0',
+    vaultBalance: vaultBalance?.toString() || '0',
+    totalAssets: totalAssets?.toString() || '0',
+    sharePrice: sharePrice?.toString() || '0',
+    allowance: allowance?.toString() || '0',
     
     // Loading states
     isApproving,
     isDepositing,
     isWithdrawing,
-    isLoading: isApproving || isDepositing || isWithdrawing,
+    isLoading: false, // Simplified for now, can be enhanced with actual loading states if needed
     
-    // Transaction hashes
-    approveHash,
-    depositHash,
-    withdrawHash,
+    // Transaction hashes (convert null to undefined)
+    approveHash: approveHash || undefined,
+    depositHash: depositHash || undefined,
+    withdrawHash: withdrawHash || undefined,
     
     // Actions
     approve,

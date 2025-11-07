@@ -1,8 +1,8 @@
 // src/hooks/useAaveV3.ts
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { erc20Abi, parseUnits, Address } from 'viem';
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useWatchTransactionReceipt } from './useWatchTransactionReceipt';
 
 // AAVE V3 Pool ABI - simplified for our use case
 const aaveV3PoolABI = [
@@ -10,9 +10,8 @@ const aaveV3PoolABI = [
     inputs: [
       { internalType: 'address', name: 'asset', type: 'address' },
       { internalType: 'uint256', name: 'amount', type: 'uint256' },
-      { internalType: 'uint256', name: 'interestRateMode', type: 'uint256' },
-      { internalType: 'uint16', name: 'referralCode', type: 'uint16' },
       { internalType: 'address', name: 'onBehalfOf', type: 'address' },
+      { internalType: 'uint16', name: 'referralCode', type: 'uint16' },
     ],
     name: 'supply',
     outputs: [],
@@ -23,11 +22,10 @@ const aaveV3PoolABI = [
     inputs: [
       { internalType: 'address', name: 'asset', type: 'address' },
       { internalType: 'uint256', name: 'amount', type: 'uint256' },
-      { internalType: 'uint256', name: 'interestRateMode', type: 'uint256' },
-      { internalType: 'address', name: 'onBehalfOf', type: 'address' },
+      { internalType: 'address', name: 'to', type: 'address' },
     ],
     name: 'withdraw',
-    outputs: [],
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'nonpayable',
     type: 'function',
   },
@@ -59,7 +57,8 @@ type AaveV3State = {
 
 export function useAaveV3(): AaveV3State {
   const { address } = useAccount();
-  const queryClient = useQueryClient();
+  // Query client is not currently used but keeping it for future use
+  // Remove unused query client
   
   const poolAddress = (import.meta.env.VITE_AAVE_POOL_ADDRESS || '') as `0x${string}`;
   const usdcAddress = (import.meta.env.VITE_USDC_ADDRESS || '') as `0x${string}`;
@@ -131,11 +130,10 @@ export function useAaveV3(): AaveV3State {
         abi: aaveV3PoolABI,
         functionName: 'supply',
         args: [
-          usdcAddress as Address, 
-          amountWei, 
-          address as Address,
-          0 as const, // interestRateMode
-          address as Address // onBehalfOf
+          usdcAddress as Address,
+          amountWei,
+          address as Address, // onBehalfOf
+          0 as const, // referralCode
         ],
       });
 
@@ -167,9 +165,9 @@ export function useAaveV3(): AaveV3State {
         abi: aaveV3PoolABI,
         functionName: 'withdraw',
         args: [
-          usdcAddress as Address, 
-          amountWei, 
-          address as Address
+          usdcAddress as Address,
+          amountWei,
+          address as Address, // to
         ],
       });
 
@@ -184,8 +182,8 @@ export function useAaveV3(): AaveV3State {
     }
   };
 
-  // Wait for transaction receipts and refetch data
-  useWaitForTransactionReceipt({
+  // Use watch to monitor transaction hashes
+  useWatchTransactionReceipt({
     hash: supplyHash,
     onSuccess: () => {
       refetchUsdcBalance();
@@ -193,7 +191,7 @@ export function useAaveV3(): AaveV3State {
     },
   });
 
-  useWaitForTransactionReceipt({
+  useWatchTransactionReceipt({
     hash: withdrawHash,
     onSuccess: () => {
       refetchUsdcBalance();

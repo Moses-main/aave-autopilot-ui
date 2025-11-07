@@ -1,19 +1,5 @@
-import { http } from 'wagmi';
-import { sepolia } from 'wagmi/chains';
-import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { QueryClient } from '@tanstack/react-query';
-
-export const config = getDefaultConfig({
-  appName: 'AAVE Autopilot',
-  projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  chains: [sepolia],
-  transports: {
-    [sepolia.id]: http(import.meta.env.VITE_RPC_URL),
-  },
-  ssr: false,
-});
-
-export const queryClient = new QueryClient();
+// Configuration is now in web3modal.ts
+export {};
 
 // Contract ABIs will be added here
 export const erc20ABI = [
