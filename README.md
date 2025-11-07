@@ -1,53 +1,190 @@
-# Octant v2 Hackathon dApp Boilerplate
+# AAVE Autopilot
 
-A production-ready React boilerplate optimized for hackathon development. Get started building your dApp in minutes with modern tooling and essential libraries pre-configured.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/Moses-main/aave-autopilot-ui)
 
-## Quick Start
+AAVE Autopilot is a decentralized application that simplifies interacting with the AAVE V3 protocol. It provides an intuitive interface for users to supply and withdraw assets from AAVE V3 with just a few clicks, making DeFi more accessible to everyone.
 
-```bash
-git clone https://github.com/golemfoundation/octant-v2-hackathon-dapp-boilerplate.git
-cd octant-v2-hackathon-dapp-boilerplate
-npm install
-npm run dev
+## ✨ Features
+
+- **Wallet Connection**: Seamlessly connect with popular Web3 wallets (MetaMask, WalletConnect, Rainbow, etc.)
+- **AAVE V3 Integration**: Direct interaction with AAVE V3 protocol on Sepolia testnet
+- **Real-time Balances**: View your wallet and AAVE V3 positions in real-time
+- **Simple Interface**: Clean and intuitive UI for managing your DeFi positions
+- **Secure**: Non-custodial solution - you maintain control of your assets
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark Mode**: Eye-friendly dark theme for extended usage
+
+## 🚀 Live Demo
+
+Check out the live demo at [https://moses-main.github.io/aave-autopilot-ui](https://moses-main.github.io/aave-autopilot-ui)
+
+## 🛠️ Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v16 or later)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+- A Web3 wallet (like [MetaMask](https://metamask.io/))
+- Testnet ETH (get some from [Sepolia Faucet](https://sepoliafaucet.com/))
+
+### Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Moses-main/aave-autopilot-ui.git
+   cd aave-autopilot-ui
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   # or
+   yarn
+   ```
+
+3. **Set up environment variables**:
+   Create a `.env` file in the root directory with the following variables:
+   ```env
+   VITE_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+   VITE_CHAIN_ID=11155111
+   VITE_AAVE_POOL_ADDRESS=0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951
+   VITE_AAVE_POOL_DATA_PROVIDER=0x3e9708d80f7B3e431180130bF846E7cC0aBcC163
+   VITE_USDC_ADDRESS=0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
+   VITE_VAULT_ADDRESS=0xA076ecA49434a4475a9FF716c2E9f20ccc453c20
+   VITE_ATOKEN_ADDRESS=0x16dA4541aD1807f4443d92D26044C1147406EB80
+   VITE_WALLETCONNECT_PROJECT_ID=your-walletconnect-project-id
+   ```
+
+   > **Note**: For production, make sure to replace the testnet addresses with mainnet addresses.
+
+4. **Start the development server**:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+5. Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## 🏗️ Project Structure
+
+```
+src/
+├── assets/              # Static assets
+├── components/          # Reusable UI components
+│   ├── ui/             # ShadCN UI components
+│   └── ...
+├── hooks/              # Custom React hooks
+│   ├── useAaveV3.ts    # AAVE V3 integration
+│   └── useVault.ts     # Vault contract interaction
+├── lib/                # Utility functions
+├── pages/              # Page components
+├── store/              # State management
+└── App.tsx             # Main application component
 ```
 
-Open [http://localhost:5173](http://localhost:5173) to see your app.
+## 🛠 Tech Stack
 
+### Frontend
+- **React 18** - UI library with concurrent features
+- **TypeScript** - Type safety and better developer experience
+- **Vite** - Next-generation frontend tooling
+- **Tailwind CSS** - Utility-first CSS framework
+- **ShadCN UI** - Beautiful, accessible components
 
-## What's Included
+### Web3 & Blockchain
+- **Wagmi** - React Hooks for Ethereum
+- **RainbowKit** - Wallet connection UI
+- **viem** - TypeScript interface for Ethereum
+- **AAVE V3 Protocol** - Decentralized lending protocol
+- **Ethers.js** - Ethereum wallet implementation
 
-### Core Stack
-- **React 19** - Latest React with improved performance
-- **Vite** - Lightning-fast build tool and dev server
-- **TypeScript** - Type safety for better DX
-- **Tailwind CSS v4** - Utility-first styling
-- **React Router v7** - Modern client-side routing
+### Development Tools
+- **ESLint** - Code linting
+- **Prettier** - Code formatting
+- **Husky** - Git hooks
+- **GitHub Actions** - CI/CD pipeline
 
-### State & Forms
-- **Zustand** - Lightweight state management (see `src/store.js`)
+### State Management & Forms
+- **Zustand** - Lightweight state management
 - **React Hook Form** - Performant form validation
 - **Zod** - Schema validation
 
 ### UI Components
-- **ShadCN UI** - High-quality, accessible components (17 ready-to-use components)
+- **ShadCN UI** - High-quality, accessible components
   - Pre-configured in `src/components/ui/`
-  - Avatar, Badge, Button, Card, Checkbox, Dialog, Dropdown Menu, Form, Input, Label, Select, Separator, Skeleton, Switch, Tabs, Tooltip, Toaster
-  - **All components visible on homepage** with interactive demos!
-- **Lucide React** - Beautiful icon library (1000+ icons)
+  - Includes: Avatar, Button, Card, Form, Input, and more
+- **Lucide React** - Beautiful icon library
 - **Sonner** - Toast notifications
+- **Framer Motion** - Animation library
 
-### Design System
-- **Dark Theme** - Custom Octant dark theme with `#0d0d0d` background
+## 🤝 Contributing
+
+Contributions are welcome! Here's how you can help:
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [AAVE Team](https://aave.com/) for the amazing protocol
+- [Vite](https://vitejs.dev/) for the amazing development experience
+- [ShadCN UI](https://ui.shadcn.com/) for the beautiful components
+- [RainbowKit](https://www.rainbowkit.com/) for wallet connection
+
+## 📞 Contact
+
+Project Link: [https://github.com/Moses-main/aave-autopilot-ui](https://github.com/Moses-main/aave-autopilot-ui)
+
+## ⚠️ Disclaimer
+
+This project is for educational purposes only. Use at your own risk. The authors are not responsible for any financial losses or damages.
 - **Arcane Fable Font** - Beautiful custom font for headings
 - **Optimized Colors** - Carefully selected palette for accessibility and readability
 
-### Smart Contract ABIs
-Pre-configured ABIs for Octant v2 integration:
-- **MorphoCompounderStrategyFactory** - Factory for Morpho yield strategies
-- **SkyCompounderStrategyFactory** - Factory for Sky protocol strategies
-- **YieldDonatingTokenizedStrategy** - Automated yield donation contract
+## Smart Contract Integration
 
-All ABIs are located in `src/abis/` and ready to import:
+The application interacts with the following smart contracts:
+
+- **AAVE V3 Pool**: `0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951` (Sepolia)
+- **AAVE V3 Pool Data Provider**: `0x3e9708d80f7B3e431180130bF846E7cC0aBcC163`
+- **USDC Token**: `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` (Sepolia)
+- **aUSDC Token**: `0x16dA4541aD1807f4443d92D26044C1147406EB80`
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+## Contact
+
+Moses Main - [@MosesMain](https://github.com/Moses-main)
+
+Project Link: [https://github.com/Moses-main/aave-autopilot-ui](https://github.com/Moses-main/aave-autopilot-ui)
+
+## Acknowledgements
+
+- [AAVE Protocol](https://aave.com/)
+- [RainbowKit](https://www.rainbowkit.com/)
+- [Wagmi](https://wagmi.sh/)
+- [ShadCN UI](https://ui.shadcn.com/)
 ```typescript
 import MorphoABI from '@/abis/MorphoCompounderStrategyFactory.json';
 import SkyABI from '@/abis/SkyCompounderStrategyFactory.json';
