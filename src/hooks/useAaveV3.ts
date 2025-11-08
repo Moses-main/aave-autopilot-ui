@@ -1,4 +1,4 @@
-import { useAccount, useReadContract, useWriteContract } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
 import { erc20Abi, parseUnits, formatUnits, Address } from 'viem';
 import { useState, useMemo } from 'react';
 import { useWatchTransactionReceipt } from './useWatchTransactionReceipt';
@@ -173,6 +173,12 @@ export function useAaveV3(): AaveV3State {
     return baseBalances;
   }, [usdcBalance, aTokenBalance, formattedUserData]);
 
+  // Get the public client for transaction receipts
+  const publicClient = usePublicClient();
+  if (!publicClient) {
+    throw new Error('Failed to initialize public client');
+  }
+  
   // Write contract
   const { writeContractAsync } = useWriteContract();
 
@@ -191,13 +197,43 @@ export function useAaveV3(): AaveV3State {
     setError(null);
 
     try {
-      // First approve USDC spending if needed
-      await writeContractAsync({
+      // First, check USDC balance
+      const balance = await publicClient.readContract({
+        address: usdcAddress,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [address],
+      });
+
+      if (balance < amountWei) {
+        throw new Error('Insufficient USDC balance');
+      }
+
+      // Approve with a small buffer to handle potential rounding issues
+      const approvalAmount = (amountWei * 11n) / 10n; // 10% buffer
+      
+      // First approve the token spending
+      const approveHash = await writeContractAsync({
         address: usdcAddress,
         abi: erc20Abi,
         functionName: 'approve',
-        args: [poolAddress, amountWei],
+        args: [poolAddress, approvalAmount],
       });
+      
+      if (!approveHash) {
+        throw new Error('Failed to send approval transaction');
+      }
+      
+      // Wait for the approval transaction to be mined
+      const approvalReceipt = await publicClient.waitForTransactionReceipt({
+        hash: approveHash,
+        confirmations: 1,
+        timeout: 60000 // 60 second timeout
+      });
+      
+      if (approvalReceipt.status !== 'success') {
+        throw new Error('Approval transaction failed');
+      }
 
       // Then supply to AAVE
       const hash = await writeContractAsync({
@@ -210,6 +246,7 @@ export function useAaveV3(): AaveV3State {
           address as Address, // onBehalfOf
           0 as const, // referralCode
         ],
+        gas: BigInt(300000), // Increased gas limit as bigint
       });
 
       setSupplyHash(hash);
