@@ -26,6 +26,9 @@ export function PositionOverview({ position, isLoading }: PositionOverviewProps)
     );
   }
 
+  // Get the first position from the vault state
+  const firstPosition = position.positions[0];
+  
   const healthFactorPercent = Math.min(Math.floor(position.healthFactor * 20), 100);
   const ltvPercent = Math.min(Math.floor(position.loanToValue * 100), 100);
   const liquidationThresholdPercent = Math.min(Math.floor(position.currentLiquidationThreshold * 100), 100);
@@ -43,9 +46,11 @@ export function PositionOverview({ position, isLoading }: PositionOverviewProps)
               <span className="text-muted-foreground">Total Supplied</span>
               <span className="font-medium">{formatUSD(parseFloat(position.totalSuppliedUSD))}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Total Borrowed</span>
-              <span className="font-medium">{formatUSD(parseFloat(position.totalBorrowedUSD))}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Borrowed</span>
+              <span className="font-mono">
+                {firstPosition ? formatNumber(parseFloat(firstPosition.borrowedUSD)) : '0'} USDC
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Available to Borrow</span>
@@ -67,11 +72,11 @@ export function PositionOverview({ position, isLoading }: PositionOverviewProps)
             </div>
           </div>
 
-          <div className="space-y-2 pt-4">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Health Factor</span>
-              <span className="font-medium">
-                {position.healthFactor === 0 ? 'N/A' : position.healthFactor.toFixed(2)}
+          <div className="grid gap-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Your Supply</span>
+              <span className="font-mono">
+                {firstPosition ? formatNumber(parseFloat(firstPosition.suppliedUSD)) : '0'} USDC
               </span>
             </div>
             <div className="pt-1">

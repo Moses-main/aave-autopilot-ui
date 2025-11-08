@@ -1,10 +1,10 @@
-// src/hooks/useAaveV3.ts
 import { useAccount, useReadContract, useWriteContract } from 'wagmi';
-import { erc20Abi, parseUnits, Address } from 'viem';
-import { useState } from 'react';
+import { erc20Abi, parseUnits, formatUnits, Address } from 'viem';
+import { useState, useMemo } from 'react';
 import { useWatchTransactionReceipt } from './useWatchTransactionReceipt';
+import { useAaveData } from './useAaveData';
 
-// AAVE V3 Pool ABI - simplified for our use case
+// AAVE V3 Pool ABI - extended with additional functions
 const aaveV3PoolABI = [
   {
     inputs: [
@@ -29,6 +29,20 @@ const aaveV3PoolABI = [
     stateMutability: 'nonpayable',
     type: 'function',
   },
+  {
+    inputs: [{ internalType: 'address', name: 'user', type: 'address' }],
+    name: 'getUserAccountData',
+    outputs: [
+      { internalType: 'uint256', name: 'totalCollateralBase', type: 'uint256' },
+      { internalType: 'uint256', name: 'totalDebtBase', type: 'uint256' },
+      { internalType: 'uint256', name: 'availableBorrowsBase', type: 'uint256' },
+      { internalType: 'uint256', name: 'currentLiquidationThreshold', type: 'uint256' },
+      { internalType: 'uint256', name: 'ltv', type: 'uint256' },
+      { internalType: 'uint256', name: 'healthFactor', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ] as const;
 
 type AaveV3State = {
@@ -36,7 +50,10 @@ type AaveV3State = {
   usdcBalance: string;
   aTokenBalance: string;
   totalSupplied: string;
-  healthFactor: string;
+  healthFactor: number;
+  loanToValue: number;
+  availableBorrows: string;
+  liquidationThreshold: number;
   
   // Loading states
   isSupplying: boolean;
@@ -51,15 +68,17 @@ type AaveV3State = {
   supply: (amount: string) => Promise<`0x${string}` | undefined>;
   withdraw: (amount: string) => Promise<`0x${string}` | undefined>;
   
+  // Refetch function
+  refetch: () => void;
+  
   // Errors
   error: Error | null;
 };
 
 export function useAaveV3(): AaveV3State {
   const { address } = useAccount();
-  // Query client is not currently used but keeping it for future use
-  // Remove unused query client
   
+  // Contract addresses from environment variables
   const poolAddress = (import.meta.env.VITE_AAVE_POOL_ADDRESS || '') as `0x${string}`;
   const usdcAddress = (import.meta.env.VITE_USDC_ADDRESS || '') as `0x${string}`;
   const aTokenAddress = (import.meta.env.VITE_ATOKEN_ADDRESS || '') as `0x${string}`;
@@ -71,38 +90,92 @@ export function useAaveV3(): AaveV3State {
   const [supplyHash, setSupplyHash] = useState<`0x${string}` | null>(null);
   const [withdrawHash, setWithdrawHash] = useState<`0x${string}` | null>(null);
 
+  // Get AAVE data using our custom hook
+  const { 
+    userData: aaveUserData, 
+    refetch: refetchAaveData 
+  } = useAaveData();
+  const isAaveDataLoading = false; // This should be managed based on your loading state
+
   // Read USDC balance
   const { 
     data: usdcBalance = 0n, 
-    refetch: refetchUsdcBalance 
+    refetch: refetchUsdcBalance,
   } = useReadContract({
     address: usdcAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
-    args: [address || '0x'],
-    query: { enabled: !!address }
+    args: [address as `0x${string}`],
+    query: {
+      enabled: !!address,
+      select: (data) => {
+        return data as bigint;
+      },
+    },
   });
 
   // Read aToken balance (user's supplied amount)
   const { 
     data: aTokenBalance = 0n, 
-    refetch: refetchATokenBalance 
+    refetch: refetchATokenBalance,
   } = useReadContract({
     address: aTokenAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
-    args: [address || '0x'],
-    query: { enabled: !!address }
+    args: [address as `0x${string}`],
+    query: {
+      enabled: !!address,
+      select: (data) => {
+        return data as bigint;
+      },
+    },
   });
 
-  // Read total supplied (can be same as aTokenBalance if no interest)
-  const totalSupplied = aTokenBalance; // In a real implementation, this would come from AAVE's data provider
+  // Format user data
+  const formattedUserData = useMemo(() => {
+    if (!aaveUserData) {
+      return {
+        healthFactor: '0',
+        loanToValue: '0',
+        availableBorrows: '0',
+        liquidationThreshold: '0',
+        totalCollateralBase: '0',
+        totalDebtBase: '0',
+      };
+    }
 
-  // Health factor (simplified - in reality this comes from AAVE's data provider)
-  const healthFactor = '1.0'; // This would be calculated based on collateral/borrows
+    return {
+      healthFactor: aaveUserData.healthFactor || '0',
+      loanToValue: aaveUserData.ltv || '0',
+      availableBorrows: aaveUserData.availableBorrowsBase || '0',
+      liquidationThreshold: aaveUserData.currentLiquidationThreshold || '0',
+      totalCollateralBase: aaveUserData.totalCollateralBase || '0',
+      totalDebtBase: aaveUserData.totalDebtBase || '0',
+    };
+  }, [aaveUserData]);
+
+  // Format balances and metrics
+  const formattedBalances = useMemo(() => {
+    const baseBalances = {
+      usdcBalance: formatUnits(usdcBalance, 6), // USDC has 6 decimals
+      aTokenBalance: formatUnits(aTokenBalance, 6), // aUSDC has 6 decimals
+      totalSupplied: formatUnits(aTokenBalance, 6), // Same as aTokenBalance for now
+      healthFactor: Number(formattedUserData.healthFactor) || 0,
+      loanToValue: Number(formattedUserData.loanToValue) || 0,
+      availableBorrows: formattedUserData.availableBorrows,
+      liquidationThreshold: Number(formattedUserData.liquidationThreshold) || 0,
+      totalCollateralBase: formattedUserData.totalCollateralBase,
+      totalDebtBase: formattedUserData.totalDebtBase,
+    };
+
+    return baseBalances;
+  }, [usdcBalance, aTokenBalance, formattedUserData]);
 
   // Write contract
   const { writeContractAsync } = useWriteContract();
+
+  // Combined loading state
+  const isLoading = isAaveDataLoading || isSupplying || isWithdrawing;
 
   // Handle supply transaction
   const supply = async (amount: string): Promise<`0x${string}` | undefined> => {
@@ -182,42 +255,59 @@ export function useAaveV3(): AaveV3State {
     }
   };
 
+  // Combined refetch function
+  const refetch = async () => {
+    await Promise.all([
+      refetchUsdcBalance(),
+      refetchATokenBalance(),
+      refetchAaveData(),
+    ]);
+  };
+
   // Use watch to monitor transaction hashes
   useWatchTransactionReceipt({
     hash: supplyHash,
     onSuccess: () => {
-      refetchUsdcBalance();
-      refetchATokenBalance();
+      refetch();
     },
   });
 
   useWatchTransactionReceipt({
     hash: withdrawHash,
     onSuccess: () => {
-      refetchUsdcBalance();
-      refetchATokenBalance();
+      refetch();
     },
   });
 
-  const state: AaveV3State = {
-    // Balances
-    usdcBalance: usdcBalance?.toString() || '0',
-    aTokenBalance: aTokenBalance?.toString() || '0',
-    totalSupplied: totalSupplied?.toString() || '0',
-    healthFactor: healthFactor?.toString() || '0',
+  return {
+    // Balances and metrics
+    usdcBalance: formattedBalances.usdcBalance,
+    aTokenBalance: formattedBalances.aTokenBalance,
+    totalSupplied: formattedBalances.totalSupplied,
+    
+    // Health metrics
+    healthFactor: formattedBalances.healthFactor,
+    loanToValue: formattedBalances.loanToValue,
+    availableBorrows: formattedBalances.availableBorrows,
+    liquidationThreshold: formattedBalances.liquidationThreshold,
+    totalCollateralBase: formattedBalances.totalCollateralBase,
+    totalDebtBase: formattedBalances.totalDebtBase,
+    
     // Loading states
     isSupplying,
     isWithdrawing,
-    isLoading: isSupplying || isWithdrawing,
+    isLoading,
+    
     // Transaction hashes
     supplyHash: supplyHash || undefined,
     withdrawHash: withdrawHash || undefined,
+    
     // Actions
     supply,
     withdraw,
+    refetch,
+    
     // Errors
-    error,
+    error: error,
   };
-
-  return state;
 }

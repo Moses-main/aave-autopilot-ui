@@ -2,16 +2,29 @@ import { http, createConfig } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { walletConnect } from 'wagmi/connectors';
 
-// 1. Get projectId at https://cloud.walletconnect.com
-const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID';
+// Get projectId from environment variables
+const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
-// 2. Create wagmi config
+if (!projectId) {
+  throw new Error('Missing VITE_WALLETCONNECT_PROJECT_ID in .env file');
+}
+
+// Create wagmi config
 export const config = createConfig({
   chains: [sepolia],
   transports: {
     [sepolia.id]: http(import.meta.env.VITE_RPC_URL),
   },
   connectors: [
-    walletConnect({ projectId }),
+    walletConnect({
+      projectId,
+      showQrModal: true,
+      qrModalOptions: {
+        themeMode: 'dark',
+        themeVariables: {
+          '--wcm-z-index': '9999'
+        }
+      }
+    }),
   ],
 });
