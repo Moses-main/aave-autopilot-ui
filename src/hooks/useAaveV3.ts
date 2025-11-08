@@ -45,15 +45,19 @@ const aaveV3PoolABI = [
   },
 ] as const;
 
-type AaveV3State = {
+interface AaveV3State {
   // Balances
   usdcBalance: string;
   aTokenBalance: string;
   totalSupplied: string;
+  
+  // Health metrics
   healthFactor: number;
   loanToValue: number;
   availableBorrows: string;
   liquidationThreshold: number;
+  totalCollateralBase: string;
+  totalDebtBase: string;
   
   // Loading states
   isSupplying: boolean;
@@ -67,11 +71,9 @@ type AaveV3State = {
   // Actions
   supply: (amount: string) => Promise<`0x${string}` | undefined>;
   withdraw: (amount: string) => Promise<`0x${string}` | undefined>;
-  
-  // Refetch function
   refetch: () => void;
   
-  // Errors
+  // Error handling
   error: Error | null;
 };
 
