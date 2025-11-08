@@ -197,27 +197,54 @@ export function useAaveV3(): AaveV3State {
     setError(null);
 
     try {
-      // First, check USDC balance
-      const balance = await publicClient.readContract({
-        address: usdcAddress,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [address],
+      // Debug logs - Enhanced with more context
+      console.log('=== DEBUG INFO ===');
+      console.log('Wallet Address:', address);
+      console.log('USDC Contract:', usdcAddress);
+      console.log('Chain ID:', await publicClient.getChainId());
+      console.log('Using RPC URL:', import.meta.env.VITE_RPC_URL);
+      console.log('Environment Variables:', {
+        VITE_RPC_URL: import.meta.env.VITE_RPC_URL,
+        VITE_CHAIN_ID: import.meta.env.VITE_CHAIN_ID,
+        VITE_USDC_ADDRESS: import.meta.env.VITE_USDC_ADDRESS
       });
+
+      // First, check USDC balance with error handling
+      let balance;
+      try {
+        balance = await publicClient.readContract({
+          address: usdcAddress,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [address],
+        });
+        console.log('USDC Balance (raw):', balance.toString());
+        console.log('USDC Balance (formatted):', formatUnits(balance, 6), 'USDC');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Error fetching USDC balance:', error);
+        throw new Error(`Failed to fetch USDC balance: ${errorMessage}`);
+      }
+    console.log('USDC Balance (formatted):', formatUnits(balance, 6), 'USDC');
+    console.log('Amount to deposit (formatted):', formatUnits(amountWei, 6), 'USDC');
+    console.log('========================');
 
       if (balance < amountWei) {
         throw new Error('Insufficient USDC balance');
       }
 
-      // Approve with a small buffer to handle potential rounding issues
-      const approvalAmount = (amountWei * 11n) / 10n; // 10% buffer
-      
-      // First approve the token spending
+      // Get the AaveAutopilot contract address from environment variables
+      const aaveAutopilotAddress = import.meta.env.VITE_AAVE_AUTOPILOT_ADDRESS as Address;
+      if (!aaveAutopilotAddress) {
+        throw new Error('AaveAutopilot contract address not configured');
+      }
+
+      // Approve the AaveAutopilot contract to spend USDC
       const approveHash = await writeContractAsync({
         address: usdcAddress,
         abi: erc20Abi,
         functionName: 'approve',
-        args: [poolAddress, approvalAmount],
+        args: [aaveAutopilotAddress, amountWei],
       });
       
       if (!approveHash) {
@@ -235,18 +262,24 @@ export function useAaveV3(): AaveV3State {
         throw new Error('Approval transaction failed');
       }
 
-      // Then supply to AAVE
+      // Deposit into AaveAutopilot vault
       const hash = await writeContractAsync({
-        address: poolAddress as Address,
-        abi: aaveV3PoolABI,
-        functionName: 'supply',
-        args: [
-          usdcAddress as Address,
-          amountWei,
-          address as Address, // onBehalfOf
-          0 as const, // referralCode
+        address: aaveAutopilotAddress,
+        abi: [
+          {
+            "inputs": [
+              {"internalType": "uint256", "name": "assets", "type": "uint256"},
+              {"internalType": "address", "name": "receiver", "type": "address"}
+            ],
+            "name": "deposit",
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          }
         ],
-        gas: BigInt(300000), // Increased gas limit as bigint
+        functionName: 'deposit',
+        args: [amountWei, address],
+        gas: BigInt(500000), // Increased gas limit for the vault interaction
       });
 
       setSupplyHash(hash);
