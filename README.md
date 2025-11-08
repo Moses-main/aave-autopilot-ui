@@ -1,13 +1,27 @@
-# AAVE Autopilot
+# 🚀 AAVE Autopilot UI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/Moses-main/aave-autopilot-ui)
+[![Open in Gitpod](https://imgpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/Moses-main/aave-autopilot-ui)
+[![Built with Vite](https://img.shields.io/badge/Built%20with-Vite-646CFF.svg)](https://vitejs.dev/)
+[![React](https://img.shields.io/badge/React-18.2.0-61DAFB.svg)](https://reactjs.org/)
+
+> **Current Status**: Beta (Sepolia Testnet)
+> - **Network**: Ethereum Sepolia (Chain ID: 11155111)
+> - **Smart Contract**: [0x4e9A9676b3E24E406a42710A06120561D5A9A045](https://sepolia.etherscan.io/address/0x4e9A9676b3E24E406a42710A06120561D5A9A045)
+> - **Last Updated**: 2025-11-08
 
 AAVE Autopilot is a decentralized application that simplifies interacting with the AAVE V3 protocol. It provides an intuitive interface for users to supply and withdraw assets from AAVE V3 with just a few clicks, making DeFi more accessible to everyone.
 
+## 📖 Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) - System design and components
+- [Development Guide](docs/DEVELOPMENT.md) - Local setup and testing
+- [Deployment Guide](docs/DEPLOYMENT.md) - Deployment instructions
+- [Smart Contracts](https://github.com/Moses-main/aave-autopilot) - Smart contract repository
+
 ## ✨ Features
 
-- **Wallet Connection**: Seamlessly connect with popular Web3 wallets (MetaMask, WalletConnect, Rainbow, etc.)
+- **Wallet Connection**: Seamlessly connect with popular Web3 wallets (MetaMask, WalletConnect, etc.)
 - **AAVE V3 Integration**: Direct interaction with AAVE V3 protocol on Sepolia testnet
 - **Real-time Balances**: View your wallet and AAVE V3 positions in real-time
 - **Simple Interface**: Clean and intuitive UI for managing your DeFi positions
@@ -19,12 +33,12 @@ AAVE Autopilot is a decentralized application that simplifies interacting with t
 
 Check out the live demo at [https://moses-main.github.io/aave-autopilot-ui](https://moses-main.github.io/aave-autopilot-ui)
 
-## 🛠️ Getting Started
+## 🛠️ Quick Start
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v16 or later)
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+- [Node.js](https://nodejs.org/) (v18 or later)
+- [npm](https://www.npmjs.com/) (v9+) or [yarn](https://yarnpkg.com/)
 - A Web3 wallet (like [MetaMask](https://metamask.io/))
 - Testnet ETH (get some from [Sepolia Faucet](https://sepoliafaucet.com/))
 
@@ -44,8 +58,14 @@ Check out the live demo at [https://moses-main.github.io/aave-autopilot-ui](http
    ```
 
 3. **Set up environment variables**:
-   Create a `.env` file in the root directory with the following variables:
+   Copy the example environment file and update the values:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Then edit the `.env` file with your configuration:
    ```env
+   # Required
    VITE_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
    VITE_CHAIN_ID=11155111
    VITE_AAVE_POOL_ADDRESS=0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951

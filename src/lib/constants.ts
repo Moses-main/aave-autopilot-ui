@@ -4,8 +4,6 @@ export const AAVE_POOL_DATA_PROVIDER = '0x9B2F5546AaE6fC2eE3BEaD55c59eB7eD8648aF
 
 // Token addresses on Sepolia
 export const USDC_ADDRESS = '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8' as const;
-// previous token address
-// 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
 
 export const CHAIN_ID = 11155111; // Sepolia
 
