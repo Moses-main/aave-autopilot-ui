@@ -1,13 +1,15 @@
-// src/components/vault/DepositForm.tsx
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useVault } from '@/hooks/useVault';
 import { parseEther } from 'viem';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 export function DepositForm() {
   const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const { 
     ethBalance,
     handleDeposit, 
@@ -44,6 +46,9 @@ export function DepositForm() {
       setError(error instanceof Error ? error.message : 'Failed to process deposit');
     }
   };
+
+  // Show error from hook if it exists
+  const displayError = error || (depositError ? String(depositError) : null);
 
   // Check if the deposit amount is valid
   const isAmountValid = () => {
@@ -96,10 +101,11 @@ export function DepositForm() {
       {isDepositSuccess && (
         <div className="text-green-500 text-sm">Deposit successful!</div>
       )}
-      {depositError && (
-        <div className="text-red-500 text-sm">
-          Error: {depositError.message || 'Transaction failed'}
-        </div>
+      {displayError && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{displayError}</AlertDescription>
+        </Alert>
       )}
     </form>
   );

@@ -3,18 +3,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useVault } from '@/hooks/useVault';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 export function WithdrawForm() {
   const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const { 
-    usdcBalance,
-    // Use deposit as a temporary workaround for withdraw
-    deposit: withdraw,
-    isDepositing: isWithdrawing,
+    aTokenBalance,
+    handleWithdraw,
+    isWithdrawing,
+    isWithdrawProcessing,
+    isWithdrawSuccess,
+    error: withdrawError
   } = useVault();
   
-  // Use usdcBalance as vaultBalance for now
-  const vaultBalance = usdcBalance;
+  const vaultBalance = aTokenBalance || '0';
   const sharePrice = '1.0';
 
   const handleMax = () => {
@@ -23,13 +27,24 @@ export function WithdrawForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) return;
+    setError(null);
+    
+    if (!amount || parseFloat(amount) <= 0) {
+      setError('Please enter a valid amount');
+      return;
+    }
+    
+    if (parseFloat(amount) > parseFloat(vaultBalance)) {
+      setError('Insufficient balance');
+      return;
+    }
 
     try {
-      await withdraw(amount);
+      await handleWithdraw(amount);
       setAmount('');
     } catch (error) {
       console.error('Withdrawal failed:', error);
+      setError(error instanceof Error ? error.message : 'Failed to process withdrawal');
     }
   };
 
@@ -37,10 +52,21 @@ export function WithdrawForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="withdraw-amount">Amount (USDC)</Label>
-          <span className="text-sm text-muted-foreground">
-            Balance: {vaultBalance} shares
-          </span>
+          <Label htmlFor="withdraw-amount">Amount (aUSDC)</Label>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Balance: {vaultBalance}
+            </span>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={handleMax}
+              disabled={!vaultBalance || parseFloat(vaultBalance) <= 0}
+            >
+              Max
+            </Button>
+          </div>
         </div>
         <div className="relative">
           <Input
@@ -82,11 +108,22 @@ export function WithdrawForm() {
 
       <Button 
         type="submit" 
-        className="w-full"
-        disabled={!amount || parseFloat(amount) <= 0 || isWithdrawing}
+        className="w-full" 
+        disabled={!amount || parseFloat(amount) <= 0 || isWithdrawing || isWithdrawProcessing}
       >
-        {isWithdrawing ? 'Withdrawing...' : 'Withdraw'}
+        {isWithdrawing || isWithdrawProcessing ? 'Processing...' : 'Withdraw'}
       </Button>
+
+      {isWithdrawSuccess && (
+        <div className="text-green-500 text-sm">Withdrawal successful!</div>
+      )}
+      
+      {(error || withdrawError) && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error || String(withdrawError)}</AlertDescription>
+        </Alert>
+      )}
     </form>
   );
 }

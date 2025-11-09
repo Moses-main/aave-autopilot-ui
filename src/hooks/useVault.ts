@@ -1,399 +1,238 @@
-// src/hooks/useVault.ts
-import { useState, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi';
-import { formatEther, parseEther } from 'viem';
+import { useState, useEffect, useMemo } from 'react';
+import { 
+  useAccount, 
+  useWriteContract, 
+  useWaitForTransactionReceipt, 
+  useBalance,
+  useReadContracts,
+  useChainId,
+} from 'wagmi';
+import { formatEther, parseEther, type Address } from 'viem';
 import { AaveAutopilotABI } from '../lib/abis/AaveAutopilot';
 import { getContractAddress } from '../lib/contracts';
 
-export function useVault() {
+interface VaultData {
+  userAddress?: `0x${string}`;
+  ethBalance: string;
+  aTokenBalance: string;
+  totalSupplied: string;
+  isLoading: boolean;
+  isDepositing: boolean;
+  isWithdrawing: boolean;
+  isDepositProcessing: boolean;
+  isWithdrawProcessing: boolean;
+  depositHash?: `0x${string}`;
+  withdrawHash?: `0x${string}`;
+  isDepositSuccess: boolean;
+  isWithdrawSuccess: boolean;
+  error: Error | null;
+  handleDeposit: (amount: string) => Promise<void>;
+  handleWithdraw: (amount: string) => Promise<void>;
+  refetch: () => void;
+}
+
+export function useVault(): VaultData {
   const { address } = useAccount();
-  const [amount, setAmount] = useState('');
+  const chainId = useChainId();
+  const [error, setError] = useState<Error | null>(null);
+
+  // Get ETH balance
+  const { 
+    data: ethBalanceData,
+    refetch: refetchEthBalance,
+    error: ethBalanceError,
+    isPending: isLoadingEthBalance
+  } = useBalance({
+    address: address as Address,
+    chainId,
+  });
 
   // Read vault data
   const { 
     data: vaultData,
     refetch: refetchVaultData,
-    isLoading: isLoadingVaultData,
+    isPending: isLoadingVaultData,
     error: vaultDataError
-  } = useReadContract({
-    address: getContractAddress('vault'),
-    abi: AaveAutopilotABI,
-    functionName: 'getUserAccountData',
-    args: [address!],
+  } = useReadContracts({
+    contracts: [
+      {
+        address: getContractAddress('vault'),
+        abi: AaveAutopilotABI,
+        functionName: 'getUserAccountData',
+        args: [address as Address],
+      },
+      {
+        address: getContractAddress('vault'),
+        abi: AaveAutopilotABI,
+        functionName: 'balanceOf',
+        args: [address as Address],
+      },
+      {
+        address: getContractAddress('vault'),
+        abi: AaveAutopilotABI,
+        functionName: 'totalSupply',
+      }
+    ],
     query: {
       enabled: !!address,
+      select: (data) => ({
+        userBalance: data[1].result as bigint,
+        totalSupply: data[2].result as bigint,
+      }),
     },
   });
 
-  // ETH balance
-  const { 
-    data: ethBalance,
-    refetch: refetchEthBalance,
-    isLoading: isLoadingEthBalance,
-    error: ethBalanceError
-  } = useBalance({
-    address,
-    query: {
-      enabled: !!address,
-    },
-  });
+  // Format balances
+  const ethBalance = useMemo(() => {
+    return ethBalanceData ? formatEther(ethBalanceData.value) : '0';
+  }, [ethBalanceData]);
+
+  const aTokenBalance = useMemo(() => {
+    if (!vaultData?.userBalance) return '0';
+    return formatEther(vaultData.userBalance);
+  }, [vaultData]);
+
+  const totalSupplied = useMemo(() => {
+    if (!vaultData?.totalSupply) return '0';
+    return formatEther(vaultData.totalSupply);
+  }, [vaultData]);
 
   // Deposit ETH to vault
   const { 
-    writeContract: depositETH,
+    writeContractAsync: depositETH,
     data: depositHash,
     isPending: isDepositing,
     error: depositError
   } = useWriteContract();
 
+  // Withdraw from vault
+  const { 
+    writeContractAsync: withdrawFromVault,
+    data: withdrawHash,
+    isPending: isWithdrawing,
+    error: withdrawError
+  } = useWriteContract();
+
   // Wait for deposit transaction
   const { 
+    isLoading: isDepositProcessing,
     isSuccess: isDepositSuccess,
-    isLoading: isDepositProcessing
+    error: depositReceiptError
   } = useWaitForTransactionReceipt({
     hash: depositHash,
   });
 
+  // Wait for withdraw transaction
+  const { 
+    isLoading: isWithdrawProcessing,
+    isSuccess: isWithdrawSuccess,
+    error: withdrawReceiptError
+  } = useWaitForTransactionReceipt({
+    hash: withdrawHash,
+  });
+
   // Handle transaction side effects
   useEffect(() => {
-    if (isDepositSuccess) {
+    if (isDepositSuccess || isWithdrawSuccess) {
       refetchVaultData();
       refetchEthBalance();
-      setAmount('');
+      setError(null);
     }
-  }, [isDepositSuccess, refetchVaultData, refetchEthBalance]);
+  }, [isDepositSuccess, isWithdrawSuccess, refetchVaultData, refetchEthBalance]);
 
-  // Handle deposit ETH
-  const handleDeposit = (amount: string) => {
-    if (!address || !amount) return;
+  // Handle deposit
+  const handleDeposit = async (amount: string): Promise<void> => {
+    if (!address) throw new Error('No wallet connected');
+    if (!amount || parseFloat(amount) <= 0) {
+      throw new Error('Invalid amount');
+    }
     
-    const amountWei = parseEther(amount);
+    setError(null);
     
-    depositETH({
-      address: getContractAddress('vault'),
-      abi: AaveAutopilotABI,
-      functionName: 'depositETH',
-      value: amountWei,
-      // depositETH doesn't take any arguments, it uses msg.value for the ETH amount
-      // and msg.sender for the depositor
-    });
+    try {
+      await depositETH({
+        address: getContractAddress('vault'),
+        abi: AaveAutopilotABI,
+        functionName: 'deposit',
+        value: parseEther(amount),
+        chainId,
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Deposit failed');
+      setError(error);
+      console.error('Deposit error:', error);
+      throw error;
+    }
   };
 
-  // Format ETH balance for display
-  const formatEthBalance = (balance: bigint | undefined) => {
-    if (balance === undefined) return '0';
-    return formatEther(balance);
+  // Handle withdraw
+  const handleWithdraw = async (amount: string): Promise<void> => {
+    if (!address) throw new Error('No wallet connected');
+    if (!amount || parseFloat(amount) <= 0) {
+      throw new Error('Invalid amount');
+    }
+    
+    setError(null);
+    
+    try {
+      await withdrawFromVault({
+        address: getContractAddress('vault'),
+        abi: AaveAutopilotABI,
+        functionName: 'withdraw',
+        args: [parseEther(amount)],
+        chainId,
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Withdrawal failed');
+      setError(error);
+      console.error('Withdrawal error:', error);
+      throw error;
+    }
   };
+
+  // Handle errors
+  useEffect(() => {
+    const error = vaultDataError || ethBalanceError || depositError || withdrawError || depositReceiptError || withdrawReceiptError;
+    if (error) {
+      console.error('Vault error:', error);
+      setError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }, [vaultDataError, ethBalanceError, depositError, withdrawError, depositReceiptError, withdrawReceiptError]);
+
+  // Log balance for debugging
+  useEffect(() => {
+    if (ethBalanceData) {
+      console.log('ETH Balance:', {
+        formatted: formatEther(ethBalanceData.value),
+        value: ethBalanceData.value.toString(),
+        decimals: ethBalanceData.decimals,
+        symbol: ethBalanceData.symbol
+      });
+    }
+  }, [ethBalanceData]);
+
+  const isLoading = isLoadingVaultData || isLoadingEthBalance;
 
   return {
-    // User data
     userAddress: address,
-    ethBalance: ethBalance ? formatEthBalance(ethBalance.value) : '0',
-    vaultData,
-    
-    // Loading states
-    isLoading: isLoadingVaultData || isLoadingEthBalance || isDepositing,
+    ethBalance,
+    aTokenBalance,
+    totalSupplied,
+    isLoading,
     isDepositing,
+    isWithdrawing,
     isDepositProcessing,
-    
-    // Transaction hash
+    isWithdrawProcessing,
     depositHash,
-    
-    // Transaction success state
+    withdrawHash,
     isDepositSuccess,
-    
-    // Errors
-    error: vaultDataError || ethBalanceError || depositError,
-    
-    // Actions
+    isWithdrawSuccess,
+    error,
     handleDeposit,
-    refetchVaultData,
-    refetchEthBalance,
+    handleWithdraw,
+    refetch: () => {
+      refetchVaultData();
+      refetchEthBalance();
+    },
   };
 }
-// import { useState } from 'react';
-// import { useAccount, useReadContract, useWriteContract } from 'wagmi';
-// import { erc20Abi, formatUnits, parseUnits, Address } from 'viem';
-// import { useWatchTransactionReceipt } from './useWatchTransactionReceipt';
-
-// // Vault ABI - simplified for our use case
-// const vaultABI = [
-//   {
-//     inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
-//     name: 'balanceOf',
-//     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-//     stateMutability: 'view',
-//     type: 'function',
-//   },
-//   {
-//     inputs: [],
-//     name: 'totalAssets',
-//     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-//     stateMutability: 'view',
-//     type: 'function',
-//   },
-//   {
-//     inputs: [
-//       { internalType: 'uint256', name: 'amount', type: 'uint256' },
-//       { internalType: 'address', name: 'receiver', type: 'address' },
-//     ],
-//     name: 'deposit',
-//     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-//     stateMutability: 'nonpayable',
-//     type: 'function',
-//   },
-//   {
-//     inputs: [
-//       { internalType: 'uint256', name: 'amount', type: 'uint256' },
-//       { internalType: 'address', name: 'receiver', type: 'address' },
-//       { internalType: 'address', name: 'owner', type: 'address' },
-//     ],
-//     name: 'withdraw',
-//     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-//     stateMutability: 'nonpayable',
-//     type: 'function',
-//   },
-// ] as const;
-
-// type VaultState = {
-//   // Balances
-//   usdcBalance: string;
-//   vaultBalance: string;
-//   totalAssets: string;
-//   sharePrice: string;
-//   allowance: string;
-  
-//   // Loading states
-//   isApproving: boolean;
-//   isDepositing: boolean;
-//   isWithdrawing: boolean;
-//   isLoading: boolean;
-  
-//   // Transaction hashes (optional)
-//   approveHash?: `0x${string}` | null;
-//   depositHash?: `0x${string}` | null;
-//   withdrawHash?: `0x${string}` | null;
-  
-//   // Actions
-//   approve: (amount: string) => Promise<`0x${string}` | undefined>;
-//   deposit: (amount: string) => Promise<`0x${string}` | undefined>;
-//   withdraw: (amount: string) => Promise<`0x${string}` | undefined>;
-  
-//   // Errors
-//   error: Error | null;
-// };
-
-// export function useVault(): VaultState {
-//   const { address } = useAccount();
-//   const vaultAddress = (import.meta.env.VITE_CONTRACT_ADDRESS || '') as `0x${string}`;
-//   const usdcAddress = (import.meta.env.VITE_USDC_ADDRESS || '') as `0x${string}`;
-  
-//   // State
-//   const [isApproving, setIsApproving] = useState(false);
-//   const [isDepositing, setIsDepositing] = useState(false);
-//   const [isWithdrawing, setIsWithdrawing] = useState(false);
-//   const [error, setError] = useState<Error | null>(null);
-//   const [approveHash, setApproveHash] = useState<`0x${string}` | null>(null);
-//   const [depositHash, setDepositHash] = useState<`0x${string}` | null>(null);
-//   const [withdrawHash, setWithdrawHash] = useState<`0x${string}` | null>(null);
-
-//   // Read USDC balance
-//   const { 
-//     data: usdcBalance = 0n, 
-//     refetch: refetchUsdcBalance 
-//   } = useReadContract({
-//     address: usdcAddress,
-//     abi: erc20Abi,
-//     functionName: 'balanceOf',
-//     args: [address || '0x'],
-//     query: { enabled: !!address }
-//   });
-
-//   // Read Vault balance
-//   const { 
-//     data: vaultBalance = 0n, 
-//     refetch: refetchVaultBalance 
-//   } = useReadContract({
-//     address: vaultAddress,
-//     abi: vaultABI,
-//     functionName: 'balanceOf',
-//     args: [address || '0x'],
-//     query: { enabled: !!address }
-//   });
-
-//   // Read total assets
-//   const { 
-//     data: totalAssets = 0n, 
-//     refetch: refetchTotalAssets 
-//   } = useReadContract({
-//     address: vaultAddress,
-//     abi: vaultABI,
-//     functionName: 'totalAssets',
-//     query: { enabled: !!address }
-//   });
-
-//   // Read allowance
-//   const { 
-//     data: allowance = 0n, 
-//     refetch: refetchAllowance 
-//   } = useReadContract({
-//     address: usdcAddress,
-//     abi: erc20Abi,
-//     functionName: 'allowance',
-//     args: [address || '0x', vaultAddress],
-//     query: { enabled: !!address }
-//   });
-
-//   // Write contract
-//   const { writeContractAsync } = useWriteContract();
-
-//   // Handle approve transaction
-//   const approve = async (amount: string): Promise<`0x${string}` | undefined> => {
-//     if (!address) {
-//       setError(new Error('No wallet connected'));
-//       return;
-//     }
-
-//     const amountWei = parseUnits(amount, 6);
-//     setIsApproving(true);
-//     setError(null);
-
-//     try {
-//       const hash = await writeContractAsync({
-//         address: usdcAddress as Address,
-//         abi: erc20Abi,
-//         functionName: 'approve',
-//         args: [vaultAddress as Address, amountWei],
-//       });
-
-//       setApproveHash(hash);
-//       return hash;
-//     } catch (err) {
-//       const error = err instanceof Error ? err : new Error('Failed to approve');
-//       setError(error);
-//       throw error;
-//     } finally {
-//       setIsApproving(false);
-//     }
-//   };
-
-//   // Handle deposit transaction
-//   const deposit = async (amount: string): Promise<`0x${string}` | undefined> => {
-//     if (!address) {
-//       setError(new Error('No wallet connected'));
-//       return;
-//     }
-
-//     const amountWei = parseUnits(amount, 6);
-//     setIsDepositing(true);
-//     setError(null);
-
-//     try {
-//       const hash = await writeContractAsync({
-//         address: vaultAddress as Address,
-//         abi: vaultABI,
-//         functionName: 'deposit',
-//         args: [amountWei, address as Address],
-//       });
-
-//       setDepositHash(hash);
-//       return hash;
-//     } catch (err) {
-//       const error = err instanceof Error ? err : new Error('Deposit failed');
-//       setError(error);
-//       throw error;
-//     } finally {
-//       setIsDepositing(false);
-//     }
-//   };
-
-//   // Handle withdraw transaction
-//   const withdraw = async (amount: string): Promise<`0x${string}` | undefined> => {
-//     if (!address) {
-//       setError(new Error('No wallet connected'));
-//       return;
-//     }
-
-//     const amountWei = parseUnits(amount, 6);
-//     setIsWithdrawing(true);
-//     setError(null);
-
-//     try {
-//       const hash = await writeContractAsync({
-//         address: vaultAddress as Address,
-//         abi: vaultABI,
-//         functionName: 'withdraw',
-//         args: [amountWei, address as Address, address as Address],
-//       });
-
-//       setWithdrawHash(hash);
-//       return hash;
-//     } catch (err) {
-//       const error = err instanceof Error ? err : new Error('Withdrawal failed');
-//       setError(error);
-//       throw error;
-//     } finally {
-//       setIsWithdrawing(false);
-//     }
-//   };
-
-//   // Watch for transaction receipts and refetch data
-//   useWatchTransactionReceipt({
-//     hash: approveHash,
-//     onSuccess: () => {
-//       refetchAllowance();
-//       refetchUsdcBalance();
-//     },
-//   });
-
-//   useWatchTransactionReceipt({
-//     hash: depositHash,
-//     onSuccess: () => {
-//       refetchUsdcBalance();
-//       refetchVaultBalance();
-//       refetchTotalAssets();
-//     },
-//   });
-
-//   useWatchTransactionReceipt({
-//     hash: withdrawHash,
-//     onSuccess: () => {
-//       refetchUsdcBalance();
-//       refetchVaultBalance();
-//       refetchTotalAssets();
-//     },
-//   });
-
-//   // Calculate share price (1e18 precision)
-//   const sharePrice = totalAssets > 0n && vaultBalance > 0n 
-//     ? formatUnits((totalAssets * 10n**18n) / vaultBalance, 18)
-//     : '0';
-
-//   return {
-//     // Balances
-//     usdcBalance: usdcBalance?.toString() || '0',
-//     vaultBalance: vaultBalance?.toString() || '0',
-//     totalAssets: totalAssets?.toString() || '0',
-//     sharePrice: sharePrice?.toString() || '0',
-//     allowance: allowance?.toString() || '0',
-    
-//     // Loading states
-//     isApproving,
-//     isDepositing,
-//     isWithdrawing,
-//     isLoading: false, // Simplified for now, can be enhanced with actual loading states if needed
-    
-//     // Transaction hashes (convert null to undefined)
-//     approveHash: approveHash || undefined,
-//     depositHash: depositHash || undefined,
-//     withdrawHash: withdrawHash || undefined,
-    
-//     // Actions
-//     approve,
-//     deposit,
-//     withdraw,
-    
-//     // Errors
-//     error,
-//   };
-// }
