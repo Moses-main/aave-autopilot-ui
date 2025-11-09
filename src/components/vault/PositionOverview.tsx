@@ -49,7 +49,7 @@ export function PositionOverview({ position, isLoading }: PositionOverviewProps)
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Borrowed</span>
               <span className="font-mono">
-                {firstPosition ? formatNumber(parseFloat(firstPosition.borrowedUSD)) : '0'} USDC
+                {firstPosition ? formatNumber(parseFloat(firstPosition.borrowedUSD)) : '0'} ETH
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -76,7 +76,7 @@ export function PositionOverview({ position, isLoading }: PositionOverviewProps)
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Your Supply</span>
               <span className="font-mono">
-                {firstPosition ? formatNumber(parseFloat(firstPosition.suppliedUSD)) : '0'} USDC
+                {firstPosition ? formatNumber(parseFloat(firstPosition.suppliedUSD)) : '0'} ETH
               </span>
             </div>
             <div className="pt-1">

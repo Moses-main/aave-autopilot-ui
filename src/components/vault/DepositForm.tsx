@@ -4,93 +4,105 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useVault } from '@/hooks/useVault';
-import { parseUnits } from 'viem';
+import { parseEther } from 'viem';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 export function DepositForm() {
   const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const { 
-    usdcBalance, 
-    allowance, 
-    approve, 
-    deposit, 
-    isApproving, 
+    ethBalance,
+    handleDeposit, 
     isDepositing,
-    isApproveSuccess,
+    isDepositProcessing,
     isDepositSuccess,
-    approveError,
-    depositError
+    error: depositError
   } = useVault();
 
-  const needsApproval = parseFloat(amount) > 0 && 
-    (BigInt(parseUnits(allowance || '0', 6)) === 0n || 
-     parseUnits(amount, 6) > BigInt(parseUnits(allowance || '0', 6)));
-
   const handleMax = () => {
-    setAmount(usdcBalance);
+    if (ethBalance) {
+      setAmount(ethBalance);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) return;
+    setError(null);
+    
+    if (!amount || parseFloat(amount) <= 0) {
+      setError('Please enter a valid amount');
+      return;
+    }
+    
+    if (ethBalance && parseFloat(amount) > parseFloat(ethBalance)) {
+      setError('Insufficient balance');
+      return;
+    }
 
     try {
-      if (needsApproval) {
-        await approve(amount);
-      } else {
-        await deposit(amount);
-      }
+      await handleDeposit(amount);
     } catch (error) {
-      console.error('Transaction failed:', error);
+      console.error('Deposit failed:', error);
+      setError(error instanceof Error ? error.message : 'Failed to process deposit');
     }
+  };
+
+  // Check if the deposit amount is valid
+  const isAmountValid = () => {
+    if (!amount) return false;
+    const amountWei = parseEther(amount);
+    const balanceWei = parseEther(ethBalance || '0');
+    return amountWei > 0n && amountWei <= balanceWei;
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="deposit-amount">Amount (USDC)</Label>
+          <Label htmlFor="deposit-amount">Amount (ETH)</Label>
           <span className="text-sm text-muted-foreground">
-            Balance: {usdcBalance} USDC
+            Balance: {ethBalance} ETH
           </span>
         </div>
         <div className="flex space-x-2">
           <Input
             id="deposit-amount"
             type="number"
-            step="0.01"
+            step="0.000000000000000001"
             min="0"
+            max={ethBalance}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
+            placeholder="0.0"
             className="flex-1"
           />
-          <Button type="button" variant="outline" onClick={handleMax}>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={handleMax}
+            disabled={!ethBalance || parseFloat(ethBalance) <= 0}
+          >
             Max
           </Button>
         </div>
       </div>
 
-      {needsApproval ? (
-        <Button type="submit" className="w-full" disabled={isApproving}>
-          {isApproving ? 'Approving...' : 'Approve USDC'}
-        </Button>
-      ) : (
-        <Button type="submit" className="w-full" disabled={isDepositing}>
-          {isDepositing ? 'Depositing...' : 'Deposit'}
-        </Button>
-      )}
+      <Button 
+        type="submit" 
+        className="w-full" 
+        disabled={!isAmountValid() || isDepositing}
+      >
+        {isDepositing || isDepositProcessing ? 'Processing...' : 'Deposit ETH'}
+      </Button>
 
-      {isApproveSuccess && (
-        <div className="text-green-500 text-sm">Approval successful! Please confirm the deposit.</div>
-      )}
       {isDepositSuccess && (
         <div className="text-green-500 text-sm">Deposit successful!</div>
       )}
-      {approveError && (
-        <div className="text-red-500 text-sm">Approval error: {approveError.message}</div>
-      )}
       {depositError && (
-        <div className="text-red-500 text-sm">Deposit error: {depositError.message}</div>
+        <div className="text-red-500 text-sm">
+          Error: {depositError.message || 'Transaction failed'}
+        </div>
       )}
     </form>
   );

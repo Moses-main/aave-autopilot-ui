@@ -1,5 +1,5 @@
-import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
-import { erc20Abi, parseUnits, formatUnits, Address } from 'viem';
+import { useAccount, useWriteContract, usePublicClient, useReadContract, useBalance } from 'wagmi';
+import { erc20Abi, parseEther, formatEther, formatUnits, Address } from 'viem';
 import { useState, useMemo } from 'react';
 import { useWatchTransactionReceipt } from './useWatchTransactionReceipt';
 import { useAaveData } from './useAaveData';
@@ -47,7 +47,7 @@ const aaveV3PoolABI = [
 
 interface AaveV3State {
   // Balances
-  usdcBalance: string;
+  ethBalance: string;
   aTokenBalance: string;
   totalSupplied: string;
   
@@ -81,8 +81,6 @@ export function useAaveV3(): AaveV3State {
   const { address } = useAccount();
   
   // Contract addresses from environment variables
-  const poolAddress = (import.meta.env.VITE_AAVE_POOL_ADDRESS || '') as `0x${string}`;
-  const usdcAddress = (import.meta.env.VITE_USDC_ADDRESS || '') as `0x${string}`;
   const aTokenAddress = (import.meta.env.VITE_ATOKEN_ADDRESS || '') as `0x${string}`;
   
   // State
@@ -99,20 +97,14 @@ export function useAaveV3(): AaveV3State {
   } = useAaveData();
   const isAaveDataLoading = false; // This should be managed based on your loading state
 
-  // Read USDC balance
+  // Read ETH balance
   const { 
-    data: usdcBalance = 0n, 
-    refetch: refetchUsdcBalance,
-  } = useReadContract({
-    address: usdcAddress,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [address as `0x${string}`],
+    data: ethBalanceData,
+    refetch: refetchEthBalance,
+  } = useBalance({
+    address: address as `0x${string}`,
     query: {
       enabled: !!address,
-      select: (data) => {
-        return data as bigint;
-      },
     },
   });
 
@@ -132,6 +124,9 @@ export function useAaveV3(): AaveV3State {
       },
     },
   });
+  
+  // Format ETH balance
+  const ethBalance = ethBalanceData ? ethBalanceData.value : 0n;
 
   // Format user data
   const formattedUserData = useMemo(() => {
@@ -159,9 +154,9 @@ export function useAaveV3(): AaveV3State {
   // Format balances and metrics
   const formattedBalances = useMemo(() => {
     const baseBalances = {
-      usdcBalance: formatUnits(usdcBalance, 6), // USDC has 6 decimals
-      aTokenBalance: formatUnits(aTokenBalance, 6), // aUSDC has 6 decimals
-      totalSupplied: formatUnits(aTokenBalance, 6), // Same as aTokenBalance for now
+      ethBalance: formatEther(ethBalance), // ETH has 18 decimals
+      aTokenBalance: formatUnits(aTokenBalance, 18), // aWETH has 18 decimals
+      totalSupplied: formatUnits(aTokenBalance, 18), // Same as aTokenBalance for now
       healthFactor: Number(formattedUserData.healthFactor) || 0,
       loanToValue: Number(formattedUserData.loanToValue) || 0,
       availableBorrows: formattedUserData.availableBorrows,
@@ -171,7 +166,7 @@ export function useAaveV3(): AaveV3State {
     };
 
     return baseBalances;
-  }, [usdcBalance, aTokenBalance, formattedUserData]);
+  }, [ethBalance, aTokenBalance, formattedUserData]);
 
   // Get the public client for transaction receipts
   const publicClient = usePublicClient();
@@ -185,14 +180,14 @@ export function useAaveV3(): AaveV3State {
   // Combined loading state
   const isLoading = isAaveDataLoading || isSupplying || isWithdrawing;
 
-  // Handle supply transaction
+  // Handle supply transaction with native ETH
   const supply = async (amount: string): Promise<`0x${string}` | undefined> => {
     if (!address) {
       setError(new Error('No wallet connected'));
       return;
     }
 
-    const amountWei = parseUnits(amount, 6); // USDC has 6 decimals
+    const amountWei = parseEther(amount); // ETH has 18 decimals
     setIsSupplying(true);
     setError(null);
 
@@ -200,37 +195,23 @@ export function useAaveV3(): AaveV3State {
       // Debug logs - Enhanced with more context
       console.log('=== DEBUG INFO ===');
       console.log('Wallet Address:', address);
-      console.log('USDC Contract:', usdcAddress);
       console.log('Chain ID:', await publicClient.getChainId());
       console.log('Using RPC URL:', import.meta.env.VITE_RPC_URL);
       console.log('Environment Variables:', {
         VITE_RPC_URL: import.meta.env.VITE_RPC_URL,
         VITE_CHAIN_ID: import.meta.env.VITE_CHAIN_ID,
-        VITE_USDC_ADDRESS: import.meta.env.VITE_USDC_ADDRESS
+        VITE_AAVE_AUTOPILOT_ADDRESS: import.meta.env.VITE_AAVE_AUTOPILOT_ADDRESS
       });
 
-      // First, check USDC balance with error handling
-      let balance;
-      try {
-        balance = await publicClient.readContract({
-          address: usdcAddress,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [address],
-        });
-        console.log('USDC Balance (raw):', balance.toString());
-        console.log('USDC Balance (formatted):', formatUnits(balance, 6), 'USDC');
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('Error fetching USDC balance:', error);
-        throw new Error(`Failed to fetch USDC balance: ${errorMessage}`);
-      }
-    console.log('USDC Balance (formatted):', formatUnits(balance, 6), 'USDC');
-    console.log('Amount to deposit (formatted):', formatUnits(amountWei, 6), 'USDC');
-    console.log('========================');
+      // Check ETH balance
+      const balance = await publicClient.getBalance({ address });
+      console.log('ETH Balance (raw):', balance.toString());
+      console.log('ETH Balance (formatted):', formatEther(balance), 'ETH');
+      console.log('Amount to deposit (formatted):', formatEther(amountWei), 'ETH');
+      console.log('========================');
 
       if (balance < amountWei) {
-        throw new Error('Insufficient USDC balance');
+        throw new Error('Insufficient ETH balance');
       }
 
       // Get the AaveAutopilot contract address from environment variables
@@ -239,46 +220,23 @@ export function useAaveV3(): AaveV3State {
         throw new Error('AaveAutopilot contract address not configured');
       }
 
-      // Approve the AaveAutopilot contract to spend USDC
-      const approveHash = await writeContractAsync({
-        address: usdcAddress,
-        abi: erc20Abi,
-        functionName: 'approve',
-        args: [aaveAutopilotAddress, amountWei],
-      });
-      
-      if (!approveHash) {
-        throw new Error('Failed to send approval transaction');
-      }
-      
-      // Wait for the approval transaction to be mined
-      const approvalReceipt = await publicClient.waitForTransactionReceipt({
-        hash: approveHash,
-        confirmations: 1,
-        timeout: 60000 // 60 second timeout
-      });
-      
-      if (approvalReceipt.status !== 'success') {
-        throw new Error('Approval transaction failed');
-      }
-
-      // Deposit into AaveAutopilot vault
+      // Deposit ETH into AaveAutopilot vault using depositETH
       const hash = await writeContractAsync({
         address: aaveAutopilotAddress,
         abi: [
           {
             "inputs": [
-              {"internalType": "uint256", "name": "assets", "type": "uint256"},
               {"internalType": "address", "name": "receiver", "type": "address"}
             ],
-            "name": "deposit",
+            "name": "depositETH",
             "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-            "stateMutability": "nonpayable",
+            "stateMutability": "payable",
             "type": "function"
           }
         ],
-        functionName: 'deposit',
-        args: [amountWei, address],
+        functionName: 'depositETH',
+        args: [address],
+        value: amountWei, // Send native ETH with the transaction
         gas: BigInt(500000), // Increased gas limit for the vault interaction
       });
 
@@ -293,27 +251,41 @@ export function useAaveV3(): AaveV3State {
     }
   };
 
-  // Handle withdraw transaction
+  // Handle withdraw transaction with ETH
   const withdraw = async (amount: string): Promise<`0x${string}` | undefined> => {
     if (!address) {
       setError(new Error('No wallet connected'));
       return;
     }
 
-    const amountWei = parseUnits(amount, 6); // aUSDC has 6 decimals
+    const amountWei = parseEther(amount); // aWETH has 18 decimals
     setIsWithdrawing(true);
     setError(null);
 
     try {
+      const aaveAutopilotAddress = import.meta.env.VITE_AAVE_AUTOPILOT_ADDRESS as Address;
+      if (!aaveAutopilotAddress) {
+        throw new Error('AaveAutopilot contract address not configured');
+      }
+
+      // Withdraw from AaveAutopilot vault
       const hash = await writeContractAsync({
-        address: poolAddress as Address,
-        abi: aaveV3PoolABI,
-        functionName: 'withdraw',
-        args: [
-          usdcAddress as Address,
-          amountWei,
-          address as Address, // to
+        address: aaveAutopilotAddress,
+        abi: [
+          {
+            "inputs": [
+              {"internalType": "uint256", "name": "shares", "type": "uint256"},
+              {"internalType": "address", "name": "receiver", "type": "address"},
+              {"internalType": "address", "name": "owner", "type": "address"}
+            ],
+            "name": "withdraw",
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          }
         ],
+        functionName: 'withdraw',
+        args: [amountWei, address, address],
       });
 
       setWithdrawHash(hash);
@@ -330,7 +302,7 @@ export function useAaveV3(): AaveV3State {
   // Combined refetch function
   const refetch = async () => {
     await Promise.all([
-      refetchUsdcBalance(),
+      refetchEthBalance(),
       refetchATokenBalance(),
       refetchAaveData(),
     ]);
@@ -353,7 +325,7 @@ export function useAaveV3(): AaveV3State {
 
   return {
     // Balances and metrics
-    usdcBalance: formattedBalances.usdcBalance,
+    ethBalance: formattedBalances.ethBalance,
     aTokenBalance: formattedBalances.aTokenBalance,
     totalSupplied: formattedBalances.totalSupplied,
     

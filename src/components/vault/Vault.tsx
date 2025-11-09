@@ -5,37 +5,33 @@ import { TokenForm } from './TokenForm';
 import { useAaveV3 } from '@/hooks/useAaveV3';
 import { useAccount, useBalance } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { USDC_ADDRESS } from '@/lib/constants';
 import { useState, useEffect } from 'react';
 import { VaultState } from '@/types/aave';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
-// USDC token on Sepolia
-export const USDC_TOKEN = {
-  address: USDC_ADDRESS as `0x${string}`,
-  symbol: 'USDC',
-  name: 'USD Coin',
-  decimals: 6,
+// ETH token configuration
+export const ETH_TOKEN = {
+  address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' as `0x${string}`,
+  symbol: 'ETH',
+  name: 'Ethereum',
+  decimals: 18,
 };
 
 export function Vault() {
   const { address } = useAccount();
-  const [activeTab, setActiveTab] = useState('deposit');
-  
-  // Get user's USDC balance with error handling
+  // Get user's ETH balance with error handling
   const { 
-    data: usdcBalanceData, 
+    data: ethBalanceData, 
     isLoading: isBalanceLoading,
     error: balanceError 
   } = useBalance({
     address,
-    token: USDC_TOKEN.address,
     chainId: 11155111, // Sepolia chain ID
   });
   
-  const walletUsdcBalance = usdcBalanceData?.value || 0n;
+  const walletEthBalance = ethBalanceData?.value || 0n;
   
   // Get user's AAVE position with error handling
   const { 
@@ -75,14 +71,14 @@ export function Vault() {
   }, [balanceError, aaveError]);
   
   // Format values for display
-  const formattedWalletBalance = walletUsdcBalance;
+  const formattedWalletBalance = walletEthBalance;
   
   // Create vault state with proper typing and null checks
   const vaultState: VaultState = (() => {
     // Default empty state
     const defaultState: VaultState = {
       positions: [{
-        asset: USDC_TOKEN,
+        asset: ETH_TOKEN,
         supplied: BigInt(0),
         suppliedUSD: '0',
         borrowed: BigInt(0),
@@ -179,37 +175,40 @@ export function Vault() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">AAVE V3 Autopilot</h1>
-            <p className="text-muted-foreground">Earn yield on your USDC with AAVE V3</p>
+            <p className="text-muted-foreground">Earn yield on your ETH with AAVE V3</p>
           </div>
           <ConnectButton />
         </div>
 
         <Tabs 
-          value={activeTab} 
-          onValueChange={setActiveTab}
-          className="w-full"
+          defaultValue="deposit" 
+          className="w-full max-w-2xl mx-auto"
         >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="deposit">Deposit</TabsTrigger>
             <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="deposit" className="space-y-6">
-            <Card className="border-none shadow-sm">
-              <CardContent className="p-6">
-                <div className="space-y-2 mb-6">
-                  <h3 className="text-lg font-semibold">Deposit USDC</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Deposit USDC to start earning yield on AAVE V3
-                  </p>
+
+          <TabsContent value="deposit">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-medium">Deposit ETH</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Deposit ETH to start earning yield on AAVE V3
+                    </p>
+                  </div>
+
+                  <TokenForm
+                    token={ETH_TOKEN}
+                    balance={formattedWalletBalance}
+                    action="supply"
+                    onSubmit={handleSupply}
+                    isLoading={isSupplying}
+                    apy={1.8} // Example APY for ETH, replace with actual value
+                  />
                 </div>
-                <TokenForm 
-                  token={USDC_TOKEN}
-                  balance={formattedWalletBalance}
-                  action="supply"
-                  onSubmit={handleSupply}
-                  isLoading={isSupplying}
-                />
               </CardContent>
             </Card>
 
@@ -223,17 +222,19 @@ export function Vault() {
             <Card className="border-none shadow-sm">
               <CardContent className="p-6">
                 <div className="space-y-2 mb-6">
-                  <h3 className="text-lg font-semibold">Withdraw USDC</h3>
+                  <h3 className="text-lg font-semibold">Withdraw ETH</h3>
                   <p className="text-sm text-muted-foreground">
-                    Withdraw USDC from your AAVE V3 position
+                    Withdraw ETH from your AAVE V3 position
                   </p>
                 </div>
-                <TokenForm 
-                  token={USDC_TOKEN}
-                  balance={BigInt(aTokenBalance || '0')}
+                <TokenForm
+                  token={ETH_TOKEN}
+                  balance={BigInt(aTokenBalance || 0)}
                   action="withdraw"
                   onSubmit={handleWithdraw}
+                  maxAmount={BigInt(totalSupplied || 0)}
                   isLoading={isWithdrawing}
+                  apy={1.8} // Example APY for ETH, replace with actual value
                 />
               </CardContent>
             </Card>

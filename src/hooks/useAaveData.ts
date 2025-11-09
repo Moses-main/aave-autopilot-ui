@@ -1,5 +1,5 @@
 import { useReadContract, useAccount } from 'wagmi';
-import {  useMemo } from 'react';
+import { useMemo } from 'react';
 import { formatUnits } from 'viem';
 import { AAVE_DATA_PROVIDER_ABI } from '../lib';
 import { getContractAddress } from '../lib/contracts';
@@ -26,7 +26,7 @@ export function useAaveData() {
   const { address } = useAccount();
   const dataProviderAddress = getContractAddress('aaveDataProvider');
   const poolAddress = getContractAddress('aavePool');
-  const usdcAddress = getContractAddress('usdc');
+  const wethAddress = getContractAddress('weth');
 
   // Get user account data
   const { data: userData, refetch: refetchUserData } = useReadContract({
@@ -39,12 +39,12 @@ export function useAaveData() {
     },
   });
 
-  // Get reserve data for USDC
+  // Get reserve data for WETH
   const { data: reserveData, refetch: refetchReserveData } = useReadContract({
     address: dataProviderAddress,
     abi: AAVE_DATA_PROVIDER_ABI,
     functionName: 'getReserveData',
-    args: [usdcAddress],
+    args: [wethAddress],
   });
 
   // Format user data

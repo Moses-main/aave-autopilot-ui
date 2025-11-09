@@ -1,18 +1,20 @@
 // src/hooks/useVault.ts
 import { useState, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { erc20Abi, formatUnits, parseUnits } from 'viem';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi';
+import { formatEther, parseEther } from 'viem';
 import { AaveAutopilotABI } from '../lib/abis/AaveAutopilot';
 import { getContractAddress } from '../lib/contracts';
 
 export function useVault() {
   const { address } = useAccount();
-  const [, setAmount] = useState('');
+  const [amount, setAmount] = useState('');
 
   // Read vault data
   const { 
     data: vaultData,
-    refetch: refetchVaultData
+    refetch: refetchVaultData,
+    isLoading: isLoadingVaultData,
+    error: vaultDataError
   } = useReadContract({
     address: getContractAddress('vault'),
     abi: AaveAutopilotABI,
@@ -23,136 +25,92 @@ export function useVault() {
     },
   });
 
-  // USDC allowance
+  // ETH balance
   const { 
-    data: allowance,
-    refetch: refetchAllowance
-  } = useReadContract({
-    address: getContractAddress('usdc'),
-    abi: erc20Abi,
-    functionName: 'allowance',
-    args: [address!, getContractAddress('vault')],
+    data: ethBalance,
+    refetch: refetchEthBalance,
+    isLoading: isLoadingEthBalance,
+    error: ethBalanceError
+  } = useBalance({
+    address,
     query: {
       enabled: !!address,
     },
   });
 
-  // USDC balance
+  // Deposit ETH to vault
   const { 
-    data: usdcBalance,
-    refetch: refetchUsdcBalance
-  } = useReadContract({
-    address: getContractAddress('usdc'),
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [address!],
-    query: {
-      enabled: !!address,
-    },
-  });
-
-  // Approve USDC
-  const { 
-    writeContract: approve,
-    data: approveHash,
-    isPending: isApproving,
-    error: approveError
-  } = useWriteContract();
-
-  // Deposit to vault
-  const { 
-    writeContract: deposit,
+    writeContract: depositETH,
     data: depositHash,
     isPending: isDepositing,
     error: depositError
   } = useWriteContract();
 
-  // Wait for approve transaction
-  const { 
-    isSuccess: isApproveSuccess
-  } = useWaitForTransactionReceipt({
-    hash: approveHash,
-  });
-
   // Wait for deposit transaction
-  const { isSuccess: isDepositSuccess } = useWaitForTransactionReceipt({
+  const { 
+    isSuccess: isDepositSuccess,
+    isLoading: isDepositProcessing
+  } = useWaitForTransactionReceipt({
     hash: depositHash,
   });
 
   // Handle transaction side effects
   useEffect(() => {
-    if (isApproveSuccess) {
-      refetchAllowance();
-    }
     if (isDepositSuccess) {
       refetchVaultData();
-      refetchUsdcBalance();
+      refetchEthBalance();
       setAmount('');
     }
-  }, [isApproveSuccess, isDepositSuccess, refetchAllowance, refetchVaultData, refetchUsdcBalance, setAmount]);
+  }, [isDepositSuccess, refetchVaultData, refetchEthBalance]);
 
-  // Handle approve
-  const handleApprove = (amount: string) => {
-    if (!address) return;
-    
-    const amountWei = parseUnits(amount, 6); // USDC has 6 decimals
-    
-    approve({
-      address: getContractAddress('usdc'),
-      abi: erc20Abi,
-      functionName: 'approve',
-      args: [getContractAddress('vault'), amountWei],
-    });
-  };
-
-  // Handle deposit
+  // Handle deposit ETH
   const handleDeposit = (amount: string) => {
-    if (!address) return;
+    if (!address || !amount) return;
     
-    const amountWei = parseUnits(amount, 6); // USDC has 6 decimals
+    const amountWei = parseEther(amount);
     
-    deposit({
+    depositETH({
       address: getContractAddress('vault'),
       abi: AaveAutopilotABI,
-      functionName: 'deposit',
-      args: [amountWei, address],
+      functionName: 'depositETH',
+      value: amountWei,
+      // depositETH doesn't take any arguments, it uses msg.value for the ETH amount
+      // and msg.sender for the depositor
     });
   };
 
-  // Format balances
-  const formattedUsdcBalance = usdcBalance ? formatUnits(usdcBalance, 6) : '0';
-  const formattedAllowance = allowance ? formatUnits(allowance, 6) : '0';
+  // Format ETH balance for display
+  const formatEthBalance = (balance: bigint | undefined) => {
+    if (balance === undefined) return '0';
+    return formatEther(balance);
+  };
 
   return {
-    // Balances
-    usdcBalance: formattedUsdcBalance,
-    allowance: formattedAllowance,
+    // User data
+    userAddress: address,
+    ethBalance: ethBalance ? formatEthBalance(ethBalance.value) : '0',
     vaultData,
     
-    // Actions
-    approve: handleApprove,
-    deposit: handleDeposit,
-    
     // Loading states
-    isApproving,
+    isLoading: isLoadingVaultData || isLoadingEthBalance || isDepositing,
     isDepositing,
+    isDepositProcessing,
     
-    // Success states
-    isApproveSuccess,
+    // Transaction hash
+    depositHash,
+    
+    // Transaction success state
     isDepositSuccess,
     
     // Errors
-    approveError,
-    depositError,
+    error: vaultDataError || ethBalanceError || depositError,
     
-    // Refetch functions
+    // Actions
+    handleDeposit,
     refetchVaultData,
-    refetchAllowance,
-    refetchUsdcBalance,
+    refetchEthBalance,
   };
 }
-
-
 // import { useState } from 'react';
 // import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 // import { erc20Abi, formatUnits, parseUnits, Address } from 'viem';
