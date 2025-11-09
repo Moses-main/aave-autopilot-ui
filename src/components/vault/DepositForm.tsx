@@ -5,12 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useVault } from '@/hooks/useVault';
 import { parseEther } from 'viem';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
 
 export function DepositForm() {
   const [amount, setAmount] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const { 
     ethBalance,
     handleDeposit, 

@@ -8,10 +8,10 @@ import { formatNumber } from '@/lib/utils';
 
 interface TokenFormProps {
   token: Token;
-  balance: bigint;
+  balance: bigint | number;
   action: 'supply' | 'withdraw';
   onSubmit: (amount: string) => Promise<void>;
-  maxAmount?: bigint;
+  maxAmount?: bigint | number;
   isLoading?: boolean;
   apy?: number;
 }
@@ -28,8 +28,10 @@ export function TokenForm({
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const balanceFormatted = formatUnits(balance, token.decimals);
-  const maxAmountFormatted = maxAmount ? formatUnits(maxAmount, token.decimals) : balanceFormatted;
+  const balanceFormatted = typeof balance === 'bigint' ? formatUnits(balance, token.decimals) : balance.toString();
+  const maxAmountFormatted = maxAmount 
+    ? (typeof maxAmount === 'bigint' ? formatUnits(maxAmount, token.decimals) : maxAmount.toString())
+    : balanceFormatted;
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

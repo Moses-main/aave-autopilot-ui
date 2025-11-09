@@ -2,6 +2,13 @@
 
 ## System Overview
 
+### Architecture Diagram
+
+![Frontend Architecture](public/frontend.png)
+*Figure 1: Frontend architecture and data flow*
+
+### Component Structure
+
 ```mermaid
 graph TD
     %% User Layer
