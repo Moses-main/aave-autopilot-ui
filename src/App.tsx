@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { Vault } from './components/vault/Vault';
+import { VaultV2 } from './components/vault/VaultV2';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
@@ -16,10 +16,8 @@ function AppContent() {
   
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-background text-foreground">
-        <Vault />
-        <SonnerToaster position="top-center" />
-      </div>
+      <VaultV2 />
+      <SonnerToaster position="top-center" />
     </BrowserRouter>
   );
 }
